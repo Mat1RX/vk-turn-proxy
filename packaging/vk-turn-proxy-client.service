@@ -5,8 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/default/vk-turn-proxy-client
-ExecStart=/bin/sh -c '/usr/bin/vk-turn-proxy-client $OPTS | /bin/bash /usr/share/vk-turn-proxy/routes.sh'
+ExecStart=/bin/sh -c '/usr/bin/vk-turn-proxy-client -c /etc/vk-turn-proxy/client.yaml | /bin/bash /usr/share/vk-turn-proxy/routes.sh'
 Restart=on-failure
 RestartSec=5
 User=root

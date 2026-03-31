@@ -5,8 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/default/vk-turn-proxy-server
-ExecStart=/usr/bin/vk-turn-proxy-server $OPTS
+ExecStart=/usr/bin/vk-turn-proxy-server -c /etc/vk-turn-proxy/server.yaml
 Restart=on-failure
 RestartSec=5
 User=nobody
