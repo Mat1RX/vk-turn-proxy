@@ -52,6 +52,7 @@ flowchart TD
 1. **Получение TURN-credentials**: Прокси обращается к API VK/Яндекса через ссылку на звонок для получения одноразовых доступов. DNS-запросы идут через резолверы VK (`77.88.8.8`) и Google для обхода локальных блокировок.
 2. **DTLS 1.2 — слой обфускации**: Создается DTLS соединение к серверу. Рекомендуется использовать флаг `-secret` (Pre-Shared Key) для защиты от MitM-атак (перехвата трафика). Пакеты WireGuard инкапсулируются внутри DTLS-потока, обфусцируя сигнатуры для DPI.
 3. **TURN relay**: Передача пакетов идет на TURN-сервер платформы, а он уже перенаправляет их на ваш VPS. Для **VK** дополнительно открывается 16 параллельных потоков для обхода ограничения скорости в ~5 Мбит/с.
+4. **Auto-Reconnect (Надежность)**: Клиент оснащен логикой *Exponential Backoff*. При падении интернета, прокси не вылетает, а бесшовно перестраивает туннель, гарантируя стабильную работу VPN.
 
 ---
 
@@ -102,7 +103,11 @@ docker run -d -p 56000:56000/udp -e CONNECT_ADDR=192.168.1.10:51820 --name vk-tu
 На сервере (вашем VPS) выполните:
 
 ```bash
+# Через флаги:
 ./vk-turn-proxy-server -listen 0.0.0.0:56000 -connect 127.0.0.1:<порт wg> -secret "my-strong-password"
+
+# ИЛИ через конфигурационный файл:
+./vk-turn-proxy-server -c server.yaml.example
 ```
 
 ### Запуск клиента
@@ -112,12 +117,16 @@ docker run -d -p 56000:56000/udp -e CONNECT_ADDR=192.168.1.10:51820 --name vk-tu
 
 **🐧 Linux:**
 ```bash
-./vk-turn-proxy-client -peer <ip VPS>:56000 -vk-link <ссылка> -listen 127.0.0.1:9000 -secret "my-strong-password" | sudo routes.sh
+# Через длинные флаги:
+./vk-turn-proxy-client -peer <ip VPS>:56000 -vk-link <ссылка> -listen 127.0.0.1:9000 -secret "my-strong-password"
+
+# ИЛИ через красивый конфигурационный файл:
+./vk-turn-proxy-client -c client.yaml.example
 ```
 
 **🪟 Windows** (PowerShell от имени Администратора):
 ```powershell
-./client.exe -peer <ip VPS>:56000 -vk-link <ссылка> -listen 127.0.0.1:9000 -secret "my-strong-password" | routes.ps1
+.\client.exe -c client.yaml.example
 ```
 
 **📱 Android:** 
@@ -129,6 +138,7 @@ docker run -d -p 56000:56000/udp -e CONNECT_ADDR=192.168.1.10:51820 --name vk-tu
 
 | Флаг | Описание | По умолчанию |
 |------|----------|--------------|
+| `-c` | Путь к файлу конфигурации YAML (Например: `client.yaml`) | - |
 | `-peer` | **Обязательный.** Адрес вашего сервера `host:port` | - |
 | `-vk-link` | Ссылка-инвайт на VK Звонок | - |
 | `-yandex-link` | Ссылка-инвайт на Яндекс Телемост | - |
