@@ -1,17 +1,21 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
 type ServerConfig struct {
-	Listen  string `yaml:"listen"`
-	Connect string `yaml:"connect"`
-	Secret  string `yaml:"secret"`
+	Listen         string `yaml:"listen"`
+	Connect        string `yaml:"connect"`
+	Secret         string `yaml:"secret"`
+	HandshakeLimit int    `yaml:"handshake_limit"`
 }
 
 type ClientConfig struct {
@@ -45,6 +49,18 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return cfg, fmt.Errorf("failed to parse yaml: %w", err)
 	}
+
+	if cfg.Secret == "" {
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err == nil {
+			cfg.Secret = hex.EncodeToString(b)
+			log.Printf("Auto-generated secure DTLS secret. Saving to %s", path)
+			if updatedYaml, err := yaml.Marshal(cfg); err == nil {
+				_ = os.WriteFile(path, updatedYaml, 0600)
+			}
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -63,6 +79,18 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return cfg, fmt.Errorf("failed to parse yaml: %w", err)
 	}
+
+	if cfg.Secret == "" {
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err == nil {
+			cfg.Secret = hex.EncodeToString(b)
+			log.Printf("Auto-generated secure DTLS secret. Saving to %s", path)
+			if updatedYaml, err := yaml.Marshal(cfg); err == nil {
+				_ = os.WriteFile(path, updatedYaml, 0600)
+			}
+		}
+	}
+
 	return cfg, nil
 }
 

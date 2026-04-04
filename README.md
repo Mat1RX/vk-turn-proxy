@@ -58,35 +58,59 @@ flowchart TD
 
 ## 🚀 Установка
 
-### 🐧 Arch Linux (AUR)
+### 🐧 Debian / Ubuntu (Systemd)
 
-Самый простой способ установки в Arch Linux с использованием AUR хелпера (например, `yay` или `paru`):
+Самый популярный способ установки для VPS:
 
+1. Скачайте последний релиз со страницы [Releases](https://github.com/cacggghp/vk-turn-proxy/releases).
+2. Распакуйте и поместите бинарник в `/usr/local/bin/`:
 ```bash
-# Установка сервера
-yay -S vk-turn-proxy-server-bin   # или -git для сборки из исходников
-
-# Установка клиента
-yay -S vk-turn-proxy-client-bin   # или -git для сборки из исходников
+sudo mv vk-turn-proxy-server /usr/local/bin/
+sudo chmod +x /usr/local/bin/vk-turn-proxy-server
 ```
+3. Создайте файл конфигурации:
+```bash
+sudo mkdir -p /etc/vk-turn-proxy
+sudo nano /etc/vk-turn-proxy/server.yaml
+```
+4. Создайте Systemd сервис (`sudo nano /etc/systemd/system/vk-turn-proxy-server.service`):
+```ini
+[Unit]
+Description=VK TURN Proxy Server
+After=network.target
 
-После установки отредактируйте конфигурационные YAML файлы и укажите нужные IP-адреса, ключи и ссылки:  
-`nano /etc/vk-turn-proxy/server.yaml`  
-`nano /etc/vk-turn-proxy/client.yaml`  
+[Service]
+ExecStart=/usr/local/bin/vk-turn-proxy-server -c /etc/vk-turn-proxy/server.yaml
+Restart=always
+User=nobody
 
-Затем добавьте службы в автозагрузку и запустите:
+[Install]
+WantedBy=multi-user.target
+```
+5. Запустите:
 ```bash
 sudo systemctl enable --now vk-turn-proxy-server
-sudo systemctl enable --now vk-turn-proxy-client
 ```
 
 ### 🐳 Docker (сервер)
 
-Вы можете развернуть серверную часть через Docker:
+Вы можете развернуть серверную часть через Docker одним запуском:
 
 ```bash
-docker build -t vk-turn-proxy .
-docker run -d -p 56000:56000/udp -e CONNECT_ADDR=192.168.1.10:51820 --name vk-turn-proxy vk-turn-proxy
+docker pull ghcr.io/cacggghp/vk-turn-proxy:latest
+docker run -d --restart unless-stopped -p 56000:56000/udp \
+  -e CONNECT_ADDR=192.168.1.10:51820 \
+  -e SECRET="my-strong-password" \
+  --name vk-turn-proxy ghcr.io/cacggghp/vk-turn-proxy:latest
+```
+
+### 💙 Arch Linux (AUR)
+
+В Arch Linux вы можете использовать AUR хелпер:
+
+```bash
+yay -S vk-turn-proxy-server-bin   # сервер
+yay -S vk-turn-proxy-client-bin   # клиент
 ```
 
 ---
@@ -227,6 +251,15 @@ docker run -d -p 56000:56000/udp -e CONNECT_ADDR=192.168.1.10:51820 --name vk-tu
 </details>
 
 ---
+
+## 🔗 Похожие проекты
+- [vk-turn-proxy-android](https://github.com/MYSOREZ/vk-turn-proxy-android) - клиент для андроида
+- [wireguard-turn-android](https://github.com/kiper292/wireguard-turn-android) - клиент для андроида интегрированный в WireGuard
+- [WINGSV](https://github.com/WINGS-N/WINGSV) - клиент для андроида с One UI, WireGuard, раздачей VPN с root
+- [turnbridge](https://github.com/nullcstring/turnbridge) - клиент для IOS
+- [turn-proxy](https://github.com/Urtyom-Alyanov/turn-proxy) - реализация на Rust
+- [lionheart](https://github.com/jaykaiperson/lionheart) - аналог для https://stream.wb.ru (статья: https://habr.com/ru/articles/1017410/)
+- [whitelist-bypass](https://github.com/kulikov0/whitelist-bypass) - проброс через медиасервер SFU ВК и Яндекс Телемоста
 
 <div align="center">
   <sub>Основано на открытом исходном коде. Спасибо проекту <a href="https://github.com/KillTheCensorship/Turnel">Turnel</a> за часть кода. ❤️</sub>

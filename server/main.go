@@ -56,6 +56,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if finalSecret == "" {
+		fmt.Fprintf(os.Stderr, "error: DTLS secret is strictly required for secure authentication. Use -secret or specify it in the config file.\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -69,10 +75,13 @@ func main() {
 		log.Fatalf("Exit...\n")
 	}()
 
+	finalHandshakeLimit := config.MergeFlagInt(explicit, "handshake_limit", 0, yamlConfig.HandshakeLimit, 100)
+
 	srv := server.New(server.Config{
-		ListenAddr:  finalListen,
-		ConnectAddr: finalConnect,
-		Secret:      finalSecret,
+		ListenAddr:     finalListen,
+		ConnectAddr:    finalConnect,
+		Secret:         finalSecret,
+		HandshakeLimit: finalHandshakeLimit,
 	})
 
 	log.Printf("Starting VK TURN Proxy server...\n")

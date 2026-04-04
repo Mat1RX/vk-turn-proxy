@@ -101,6 +101,12 @@ func main() {
 		log.Fatalf("failed to resolve peer address %q: %v", finalPeer, err)
 	}
 
+	if finalSecret == "" {
+		fmt.Fprintf(os.Stderr, "error: DTLS secret is strictly required for secure authentication. Use -secret or specify it in the config file.\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if (finalVkLink == "") == (finalYaLink == "") {
 		fmt.Fprintf(os.Stderr, "error: exactly one of -vk-link or -yandex-link is required (via flag or yaml)\n\n")
 		flag.Usage()

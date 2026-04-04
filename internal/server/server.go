@@ -15,9 +15,10 @@ import (
 
 // Config holds the configuration for the Server
 type Config struct {
-	ListenAddr  string
-	ConnectAddr string
-	Secret      string
+	ListenAddr     string
+	ConnectAddr    string
+	Secret         string
+	HandshakeLimit int
 }
 
 // Server handles listening for obfuscated DTLS packets and tunneling them
@@ -61,6 +62,12 @@ func (s *Server) Run(ctx context.Context) error {
 		log.Println("Listening with self-signed certificate")
 	}
 
+	limit := s.config.HandshakeLimit
+	if limit <= 0 {
+		limit = 100 // default fallback
+	}
+	sem := make(chan struct{}, limit)
+
 	var wg sync.WaitGroup
 	for {
 		select {
@@ -81,11 +88,18 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}
 
-		wg.Add(1)
-		go func(c net.Conn) {
-			defer wg.Done()
-			s.handleConnection(ctx, c)
-		}(conn)
+		select {
+		case sem <- struct{}{}:
+			wg.Add(1)
+			go func(c net.Conn) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				s.handleConnection(ctx, c)
+			}(conn)
+		default:
+			log.Printf("Rate limit exceeded for Handshakes, dropping incoming connection attempt")
+			_ = conn.Close()
+		}
 	}
 }
 
@@ -104,8 +118,8 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	// Perform the handshake with a 30-second timeout
-	ctx1, cancel1 := context.WithTimeout(ctx, 30*time.Second)
+	// Perform the handshake with a 5-second timeout to mitigate DoS attempts
+	ctx1, cancel1 := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel1()
 	
 	log.Println("Start handshake")
