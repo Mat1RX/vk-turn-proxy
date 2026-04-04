@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -87,17 +88,56 @@ func GetCreds(link string, dialer *dnsdialer.Dialer) (user string, pass string, 
 	token1 := resp1.Data.AccessToken
 
 	// 2. Get anonymous call token using the invite link
-	var resp2 struct {
-		Response struct {
-			Token string `json:"token"`
-		} `json:"response"`
-	}
 	data2 := fmt.Sprintf("vk_join_link=https://vk.com/call/join/%s&name=123&access_token=%s", link, token1)
 	url2 := fmt.Sprintf("https://api.vk.ru/method/calls.getAnonymousToken?v=5.274&client_id=%s", clientID)
-	if err := doRequest(data2, url2, &resp2); err != nil {
-		return "", "", "", fmt.Errorf("step 2 (getAnonymousToken) failed: %w", err)
+	var token2 string
+	const maxCaptchaAttempts = 3
+	for attempt := 0; attempt <= maxCaptchaAttempts; attempt++ {
+		var resp2 map[string]interface{}
+		if err := doRequest(data2, url2, &resp2); err != nil {
+			return "", "", "", fmt.Errorf("step 2 request failed: %w", err)
+		}
+
+		// Check for captcha error
+		if errObj, hasErr := resp2["error"].(map[string]interface{}); hasErr {
+			errCode, _ := errObj["error_code"].(float64)
+			if errCode == 14 {
+				if attempt == maxCaptchaAttempts {
+					return "", "", "", fmt.Errorf("captcha failed after %d attempts", maxCaptchaAttempts)
+				}
+
+				captchaErr := parseVkCaptchaError(errObj)
+				if captchaErr.SessionToken != "" {
+					successToken, solveErr := solveVkCaptcha(context.Background(), captchaErr, dialer)
+					if solveErr != nil {
+						return "", "", "", fmt.Errorf("auto captcha solve error: %w", solveErr)
+					}
+
+					if captchaErr.CaptchaAttempt == "0" || captchaErr.CaptchaAttempt == "" {
+						captchaErr.CaptchaAttempt = "1"
+					}
+
+					data2 = fmt.Sprintf("vk_join_link=https://vk.com/call/join/%s&name=123&access_token=%s&captcha_key=&captcha_sid=%s&is_sound_captcha=0&success_token=%s&captcha_ts=%s&captcha_attempt=%s",
+						link, token1, captchaErr.CaptchaSid, neturl.QueryEscape(successToken), captchaErr.CaptchaTs, captchaErr.CaptchaAttempt)
+					continue
+				} else {
+					return "", "", "", fmt.Errorf("old image captcha detected - not supported in auto solver")
+				}
+			}
+			return "", "", "", fmt.Errorf("VK API error: %v", errObj)
+		}
+
+		respMap, ok := resp2["response"].(map[string]interface{})
+		if !ok {
+			return "", "", "", fmt.Errorf("unexpected getAnonymousToken response: %v", resp2)
+		}
+		var okToken bool
+		token2, okToken = respMap["token"].(string)
+		if !okToken {
+			return "", "", "", fmt.Errorf("missing token in response: %v", resp2)
+		}
+		break
 	}
-	token2 := resp2.Response.Token
 
 	// 3. Login anonymously to OKCDN WebRTC backend
 	var resp3 struct {
